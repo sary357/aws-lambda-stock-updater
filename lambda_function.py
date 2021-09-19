@@ -8,29 +8,30 @@ import smtplib
 import sys
 import json
 
+import gspread
+import time
+from oauth2client.service_account import ServiceAccountCredentials
 
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-bucket=os.environ['S3_BUCKET_NAME']
-data_folder=os.environ['DATA_FOLDER']
-stock_url=os.environ['TWSE_API_URL']
 
-sender=os.environ['SENDER']
-recipients=os.environ['MAIL_RECIPIENTS']
-key_file_name=os.environ["KEY_FILE"].strip()
+bucket=os.getenv('S3_BUCKET_NAME', default='')
+data_folder=os.getenv('DATA_FOLDER', default=None)
+
+stock_url=os.getenv('TWSE_API_URL', default='http://www.twse.com.tw/exchangeReport/STOCK_DAY_AVG?response=json&date=DATE&stockNo=STOCK_NUMBER&_=CURRENT_TIME')
+sender=os.getenv('SENDER', default=None)
+recipients=os.getenv('MAIL_RECIPIENTS', default=None)
+key_file_name=os.getenv("KEY_FILE", default='').strip()
+sheet_key=os.getenv("SHEET_KET", default='1lkFBcY9TezpxHz-tEwTrgWXUlE9didAYDh0b-CnqgdI')
 
 # SMTP Config
-EMAIL_HOST = os.environ['EMAIL_HOST']
-EMAIL_HOST_USER = os.environ['EMAIL_HOST_USER']
-EMAIL_HOST_PASSWORD = os.environ['EMAIL_HOST_PASSWORD']
-EMAIL_PORT = int(os.environ['EMAIL_PORT'])
+EMAIL_HOST = os.getenv('EMAIL_HOST', default=None)
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', default=None)
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', default=None)
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', default=0))
 
-def download_stock_from_url(stock_number, diff_date=0):
-######################################################################
-######################################################################
-    
-    result_dic={}
+def download_stock_from_url(stock_number, diff_date=0):    
     yesterday = date.today() - timedelta(diff_date)
     str_yesterday=yesterday.strftime('%Y%m%d')
     current_time=datetime.utcnow()
@@ -56,14 +57,44 @@ def download_stock_from_url(stock_number, diff_date=0):
                     return stock_info
             return None
         else:
-            return None;
+            return None
     except Exception as e:
         print('Failed to get info from the URL:("' +destination_url + '") Or the format of API changed.' )
         notify_by_mail("[注意!!] "+current_time+" 無法抓取股市資訊",
         'Failed to get info from the URL:("' +stock_url + '") Or the format of API changed.',1)
         raise
 
+def gsheet(key_file='./maplocationapi01-fb349ce93ae5.json'):
+    scopes = ["https://spreadsheets.google.com/feeds"]
+ 
+    credentials = ServiceAccountCredentials.from_json_keyfile_name(
+	    key_file, scopes)
+ 
+    client = gspread.authorize(credentials)
+ 
+    sheet = client.open_by_key(sheet_key).worksheet('存股紀錄')
     
+    idx=3
+    while sheet.cell(idx,2).value != None:
+        stock_number=(sheet.cell(idx, 2).value)
+        stock_info=download_stock_from_url(stock_number=stock_number)
+        if(stock_info!=None):
+            date, price=download_stock_from_url(stock_number=stock_number)
+            time.sleep(1)
+            sheet.update_cell(idx,15, price)
+            time.sleep(1)
+            sheet.update_cell(idx,16, date[-5:])
+            time.sleep(1)
+        
+        idx=idx+1
+        
+    sheet.format('o3:p100' ,{'textFormat':{"foregroundColor": {
+        "red": 0,
+        "green": 0,
+        "blue": 0
+      }}})
+        
+
 def notify_by_mail(mail_subject, mail_body, priority=None):
     current_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     msg = MIMEText(mail_body+'\n* This report is generated at '+current_time)
@@ -84,7 +115,7 @@ def get_key_file_from_s3():
     try: 
         bucketObj=s3.Bucket(bucket)
         bucketObj.download_file(data_folder+'/'+key_file_name,'/tmp/'+key_file_name)
-        key_file = open('/tmp/'+key_file_name, 'r')
+        print("key file downloaded: {}{}".format('/tmp/', key_file_name))
     except botocore.exceptions.ClientError as e:
         if e.response['Error']['Code'] == "404":
             print("The object ("+data_folder+'/'+key_file_name+") does not exist.")
@@ -94,9 +125,21 @@ def get_key_file_from_s3():
 
 def lambda_handler(event, context):
     # TODO implement
-    download_stock_from_url('2882')
+    # Step 1: Download google key file
+    print("Step 1:")
     get_key_file_from_s3()
+
+    # Step 2: read stock number from google spreadsheet and crawl TWSE to get stock info
+    print("Step 2:")
+    gsheet('/tmp/'+key_file_name)
+    
     return {
         'statusCode': 200,
         'body': json.dumps('No news is good news!')
     }
+
+def google_spreadsheet_test():
+    gsheet()
+
+if __name__ == '__main__':
+    google_spreadsheet_test()
