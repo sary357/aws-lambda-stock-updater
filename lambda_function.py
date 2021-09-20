@@ -95,7 +95,11 @@ def gsheet(key_file='./maplocationapi01-fb349ce93ae5.json'):
             time.sleep(1)
         
         idx=idx+1
-        
+    idx=idx+2
+    sheet.update_cell(idx,15, 'Updated time:')   
+    time.sleep(1)    
+    sheet.update_cell(idx,16, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))   
+    
 
 
 def notify_by_mail(mail_subject, mail_body, priority=None):
