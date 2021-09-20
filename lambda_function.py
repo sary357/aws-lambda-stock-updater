@@ -80,7 +80,7 @@ def gsheet(key_file='./maplocationapi01-fb349ce93ae5.json'):
     while sheet.cell(idx,2).value != None and len(sheet.cell(idx,2).value)>0:
         stock_number=(sheet.cell(idx, 2).value)
         price=get_stock_price(stock_number,stocks_info)
-        print('fill stock info: {}'.format(stock_number))
+        print('Fill stock info into Google Spreadsheet: {}'.format(stock_number))
         if(price!=None):
             price=price.replace(',','')
             time.sleep(1)
