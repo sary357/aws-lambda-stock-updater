@@ -23,7 +23,7 @@ stock_url=os.getenv('TWSE_API_URL', default='https://www.twse.com.tw/exchangeRep
 sender=os.getenv('SENDER', default=None)
 recipients=os.getenv('MAIL_RECIPIENTS', default=None)
 key_file_name=os.getenv("KEY_FILE", default='').strip()
-sheet_key=os.getenv("SHEET_KET", default='1lkFBcY9TezpxHz-tEwTrgWXUlE9didAYDh0b-CnqgdI')
+sheet_key=os.getenv("SHEET_KEY", default='1lkFBcY9TezpxHz-tEwTrgWXUlE9didAYDh0b-CnqgdI')
 
 # SMTP Config
 EMAIL_HOST = os.getenv('EMAIL_HOST', default=None)
@@ -35,11 +35,12 @@ def download_stock_from_url():
     today = date.today() 
     
     try: 
-        print("Download JSON from URL: " + stock_url) 
+        print("Download JSON from URL: {}".format(stock_url)) 
         with urllib.request.urlopen(stock_url) as f:
             response=f.read().decode('utf-8')
             json_obj=json.loads(response)
-            
+        
+        print("Get response from URL: {}".format(stock_url))
         if json_obj['stat'] == 'OK':
             tmp_json_obj=json_obj['data']
             return tmp_json_obj, json_obj['title'][:10][-6:].replace('月','/').replace('日','')
@@ -60,15 +61,19 @@ def get_stock_price(stock_no, stocks_obj=None):
         return None
 
 def gsheet(key_file='./maplocationapi01-fb349ce93ae5.json'):
+    print("key file: {}".format(key_file))
     scopes = ["https://spreadsheets.google.com/feeds"]
  
     credentials = ServiceAccountCredentials.from_json_keyfile_name(
 	    key_file, scopes)
  
+    print("Google API authoization")
     client = gspread.authorize(credentials)
  
+    print("Open a worksheet: {}".format(sheet_key))
     sheet = client.open_by_key(sheet_key).worksheet('存股紀錄')
     
+    print("Get stock info and close date")
     stocks_info,stock_close_date=download_stock_from_url()
     
     idx=3
