@@ -100,18 +100,20 @@ def gsheet(key_file='./maplocationapi01-fb349ce93ae5.json'):
 
 def notify_by_mail(mail_subject, mail_body, priority=None):
     current_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    msg = MIMEText(mail_body+'\n* This report is generated at '+current_time)
-    msg['Subject'] = mail_subject
-    msg['From'] = sender
-    msg['To'] = recipients
-    if priority != None and int(priority) >=1 and int(priority)<=5:
-        msg['X-Priority'] = str(priority)
-   
-    s = smtplib.SMTP(EMAIL_HOST, EMAIL_PORT)
-    s.starttls()
-    s.login(EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
-    s.send_message(msg)
-    s.quit()
+    print('email sent out: {}'.format(mail_subject))
+    if EMAIL_HOST != None and EMAIL_PORT != None:
+        msg = MIMEText(mail_body+'\n* This report is generated at '+current_time)
+        msg['Subject'] = mail_subject
+        msg['From'] = sender
+        msg['To'] = recipients
+        if priority != None and int(priority) >=1 and int(priority)<=5:
+            msg['X-Priority'] = str(priority)
+    
+        s = smtplib.SMTP(EMAIL_HOST, EMAIL_PORT)
+        s.starttls()
+        s.login(EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
+        s.send_message(msg)
+        s.quit()
     
 def get_key_file_from_s3():
     s3=boto3.resource('s3')
@@ -120,9 +122,12 @@ def get_key_file_from_s3():
         bucketObj.download_file(data_folder+'/'+key_file_name,'/tmp/'+key_file_name)
         print("key file downloaded: {}{}".format('/tmp/', key_file_name))
     except botocore.exceptions.ClientError as e:
+        today = date.today() 
         if e.response['Error']['Code'] == "404":
             print("The object ("+data_folder+'/'+key_file_name+") does not exist.")
-            return None
+            notify_by_mail("[注意!!] 今天: "+str(today)+" 無法抓取 key file: "+data_folder+'/'+key_file_name,
+            "The object ("+data_folder+'/'+key_file_name+") does not exist.",1)
+            raise
         else:
             raise
 
