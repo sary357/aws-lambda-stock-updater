@@ -19,7 +19,7 @@ from email.mime.text import MIMEText
 bucket=os.getenv('S3_BUCKET_NAME', default='')
 data_folder=os.getenv('DATA_FOLDER', default=None)
 
-stock_url=os.getenv('TWSE_API_URL', default='http://www.twse.com.tw/exchangeReport/STOCK_DAY_AVG?response=json&date=DATE&stockNo=STOCK_NUMBER&_=CURRENT_TIME')
+stock_url=os.getenv('TWSE_API_URL', default='https://www.twse.com.tw/exchangeReport/STOCK_DAY_AVG_ALL?re')
 sender=os.getenv('SENDER', default=None)
 recipients=os.getenv('MAIL_RECIPIENTS', default=None)
 key_file_name=os.getenv("KEY_FILE", default='').strip()
@@ -31,38 +31,33 @@ EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', default=None)
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', default=None)
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', default=0))
 
-def download_stock_from_url(stock_number, diff_date=0):    
-    yesterday = date.today() - timedelta(diff_date)
-    str_yesterday=yesterday.strftime('%Y%m%d')
-    current_time=datetime.utcnow()
-    try:
-        destination_url=stock_url.replace("CURRENT_TIME",current_time.strftime('%s'))
-        destination_url=destination_url.replace("DATE", str_yesterday)
-        destination_url=destination_url.replace("STOCK_NUMBER", str(stock_number))
-        
-        print("Download JSON from URL: " + destination_url) 
-        with urllib.request.urlopen(destination_url) as f:
+def download_stock_from_url():    
+    today = date.today() 
+    
+    try: 
+        print("Download JSON from URL: " + stock_url) 
+        with urllib.request.urlopen(stock_url) as f:
             response=f.read().decode('utf-8')
             json_obj=json.loads(response)
             
         if json_obj['stat'] == 'OK':
             tmp_json_obj=json_obj['data']
-            max=''
-           # print(tmp_json_obj)
-            for stock_info in tmp_json_obj:
-                if stock_info[0] > max and (stock_info[0][0:2].isnumeric() ):
-                    max=stock_info[0]
-            for stock_info in tmp_json_obj:
-                if stock_info[0] == max:
-                    return stock_info
-            return None
+            return tmp_json_obj, json_obj['title'][:10][-6:].replace('月','/').replace('日','')
         else:
             return None
     except Exception as e:
-        print('Failed to get info from the URL:("' +destination_url + '") Or the format of API changed.' )
-        notify_by_mail("[注意!!] "+current_time+" 無法抓取股市資訊",
+        print('Failed to get info from the URL:("' +stock_url + '") Or the format of API changed.' )
+        notify_by_mail("[注意!!] 今天: "+str(today)+" 無法抓取股市資訊",
         'Failed to get info from the URL:("' +stock_url + '") Or the format of API changed.',1)
         raise
+
+def get_stock_price(stock_no, stocks_obj=None):
+    if stocks_obj:
+        for stock_obj in stocks_obj:
+            if stock_obj[0] == str(stock_no):
+                return stock_obj[2]
+    else:
+        return None
 
 def gsheet(key_file='./maplocationapi01-fb349ce93ae5.json'):
     scopes = ["https://spreadsheets.google.com/feeds"]
@@ -74,26 +69,34 @@ def gsheet(key_file='./maplocationapi01-fb349ce93ae5.json'):
  
     sheet = client.open_by_key(sheet_key).worksheet('存股紀錄')
     
+    stocks_info,stock_close_date=download_stock_from_url()
+    
     idx=3
-    while sheet.cell(idx,2).value != None:
+    while sheet.cell(idx,2).value != None and len(sheet.cell(idx,2).value)>0:
         stock_number=(sheet.cell(idx, 2).value)
-        stock_info=download_stock_from_url(stock_number=stock_number)
-        if(stock_info!=None):
-            date, price=download_stock_from_url(stock_number=stock_number)
+        price=get_stock_price(stock_number,stocks_info)
+        print('fill stock info: {}'.format(stock_number))
+        if(price!=None):
+            price=price.replace(',','')
             time.sleep(1)
             sheet.update_cell(idx,15, price)
             time.sleep(1)
-            sheet.update_cell(idx,16, date[-5:])
+            sheet.update_cell(idx,16, stock_close_date)
+            time.sleep(1)
+            
+            price_float=float(price)
+            price_5_percent=float(sheet.cell(idx,6).value)
+            time.sleep(1)
+
+            if price_5_percent>=price_float:
+                sheet.update_cell(idx,17, 'V')
+            else:
+                sheet.update_cell(idx,17, '')
             time.sleep(1)
         
         idx=idx+1
         
-    sheet.format('o3:p100' ,{'textFormat':{"foregroundColor": {
-        "red": 0,
-        "green": 0,
-        "blue": 0
-      }}})
-        
+
 
 def notify_by_mail(mail_subject, mail_body, priority=None):
     current_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -126,11 +129,11 @@ def get_key_file_from_s3():
 def lambda_handler(event, context):
     # TODO implement
     # Step 1: Download google key file
-    print("Step 1:")
+    print("Step 1: download google key file")
     get_key_file_from_s3()
 
     # Step 2: read stock number from google spreadsheet and crawl TWSE to get stock info
-    print("Step 2:")
+    print("Step 2: read stock number from google spreadsheet and crawl TWSE to get stock info")
     gsheet('/tmp/'+key_file_name)
     
     return {
