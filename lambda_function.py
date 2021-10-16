@@ -159,7 +159,8 @@ def lambda_handler(event, context):
     print("Step 3: decide whether we need to notify")
     if possible_stocks_saving_list != None:
         today = date.today() 
-        notify_by_mail(str(today).replace('-','/')+' 存股標的通知', '存股標的:\n\n'+'\n'.join(possible_stocks_saving_list)+'\n\nGoogle Sheet URL: '+google_sheet_url)     
+        today_str = str(today).replace('-','/')
+        notify_by_mail(today_str+' 存股標的通知', today_str+' 存股標的:\n\n'+'\n'.join(possible_stocks_saving_list)+'\n\nGoogle Sheet URL: '+google_sheet_url)     
     return {
         'statusCode': 200,
         'body': json.dumps('No news is good news!')
