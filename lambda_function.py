@@ -99,7 +99,7 @@ def gsheet(key_file='./maplocationapi01-fb349ce93ae5.json'):
 
             if price_5_percent>=price_float:
                 sheet.update_cell(idx,17, 'V')
-                possible_stocks_saving_list.append(str(stock_number)+" "+str(stock_name)+" (收盤價:" + str(price)+")")
+                possible_stocks_saving_list.append(str(stock_number)+" "+str(stock_name)+" (收盤價: " + str(price)+")")
             else:
                 sheet.update_cell(idx,17, '')
             time.sleep(1)
@@ -158,7 +158,8 @@ def lambda_handler(event, context):
 
     print("Step 3: decide whether we need to notify")
     if possible_stocks_saving_list != None:
-        notify_by_mail('存股標的通知', '存股標的:\n\n'+'\n'.join(possible_stocks_saving_list)+'\n\nGoogle Sheet URL: '+google_sheet_url)     
+        today = date.today() 
+        notify_by_mail(str(today).replace('-','/')+' 存股標的通知', '存股標的:\n\n'+'\n'.join(possible_stocks_saving_list)+'\n\nGoogle Sheet URL: '+google_sheet_url)     
     return {
         'statusCode': 200,
         'body': json.dumps('No news is good news!')
