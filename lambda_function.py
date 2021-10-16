@@ -24,6 +24,7 @@ sender=os.getenv('SENDER', default=None)
 recipients=os.getenv('MAIL_RECIPIENTS', default=None)
 key_file_name=os.getenv("KEY_FILE", default='').strip()
 sheet_key=os.getenv("SHEET_KEY", default='1lkFBcY9TezpxHz-tEwTrgWXUlE9didAYDh0b-CnqgdI')
+google_sheet_url=os.getenv("GOOGLE_SHEET_URL", default='https://docs.google.com/spreadsheets/d/1lkFBcY9TezpxHz-tEwTrgWXUlE9didAYDh0b-CnqgdI/edit#gid=1834000065')
 
 # SMTP Config
 EMAIL_HOST = os.getenv('EMAIL_HOST', default=None)
@@ -61,6 +62,7 @@ def get_stock_price(stock_no, stocks_obj=None):
         return None
 
 def gsheet(key_file='./maplocationapi01-fb349ce93ae5.json'):
+    possible_stocks_saving_list=[]
     print("key file: {}".format(key_file))
     scopes = ["https://spreadsheets.google.com/feeds"]
  
@@ -79,6 +81,8 @@ def gsheet(key_file='./maplocationapi01-fb349ce93ae5.json'):
     idx=3
     while sheet.cell(idx,2).value != None and len(sheet.cell(idx,2).value)>0:
         stock_number=(sheet.cell(idx, 2).value)
+        time.sleep(1)
+        stock_name=sheet.cell(idx, 3).value
         price=get_stock_price(stock_number,stocks_info)
         print('Fill stock info into Google Spreadsheet: {}'.format(stock_number))
         if(price!=None):
@@ -95,6 +99,7 @@ def gsheet(key_file='./maplocationapi01-fb349ce93ae5.json'):
 
             if price_5_percent>=price_float:
                 sheet.update_cell(idx,17, 'V')
+                possible_stocks_saving_list.append(str(stock_number)+" "+str(stock_name))
             else:
                 sheet.update_cell(idx,17, '')
             time.sleep(1)
@@ -103,7 +108,8 @@ def gsheet(key_file='./maplocationapi01-fb349ce93ae5.json'):
     idx=idx+2
     sheet.update_cell(idx,15, 'Updated time:')   
     time.sleep(1)    
-    sheet.update_cell(idx,16, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))   
+    sheet.update_cell(idx,16, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    return possible_stocks_saving_list
     
 
 
@@ -111,7 +117,7 @@ def notify_by_mail(mail_subject, mail_body, priority=None):
     current_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     print('email sent out: {}'.format(mail_subject))
     if EMAIL_HOST != None and EMAIL_PORT != None:
-        msg = MIMEText(mail_body+'\n* This report is generated at '+current_time)
+        msg = MIMEText(mail_body+'\n\n\n* This report is generated at '+current_time)
         msg['Subject'] = mail_subject
         msg['From'] = sender
         msg['To'] = recipients
@@ -148,8 +154,11 @@ def lambda_handler(event, context):
 
     # Step 2: read stock number from google spreadsheet and crawl TWSE to get stock info
     print("Step 2: read stock number from google spreadsheet and crawl TWSE to get stock info")
-    gsheet('/tmp/'+key_file_name)
-    
+    possible_stocks_saving_list=gsheet('/tmp/'+key_file_name)
+
+    print("Step 3: decide whether we need to notify")
+    if possible_stocks_saving_list != None:
+        notify_by_mail('存股標的通知', '存股標的:\n\n'+'\n'.join(possible_stocks_saving_list)+'\n\nGoogle Sheet URL: '+google_sheet_url)     
     return {
         'statusCode': 200,
         'body': json.dumps('No news is good news!')
