@@ -99,7 +99,7 @@ def gsheet(key_file='./maplocationapi01-fb349ce93ae5.json'):
 
             if price_5_percent>=price_float:
                 sheet.update_cell(idx,17, 'V')
-                possible_stocks_saving_list.append(str(stock_number)+" "+str(stock_name)+" (收盤價: " + str(price)+")")
+                possible_stocks_saving_list.append(str(stock_number)+" "+str(stock_name)+" (收盤價: " + str(price)+"/年殖利率 5% 的價格: "+str(price_5_percent)+")")
             else:
                 sheet.update_cell(idx,17, '')
             time.sleep(1)
