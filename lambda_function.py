@@ -97,9 +97,12 @@ def gsheet(key_file='./maplocationapi01-fb349ce93ae5.json'):
             price_5_percent=float(sheet.cell(idx,6).value)
             time.sleep(1)
 
+            current_dividend_yield=str(sheet.cell(idx,19).value)
+            time.sleep(1)
+
             if price_5_percent>=price_float:
                 sheet.update_cell(idx,17, 'V')
-                possible_stocks_saving_list.append(str(stock_number)+" "+str(stock_name)+" (收盤價: " + str(price)+"/年殖利率 5% 的價格: "+str(price_5_percent)+")")
+                possible_stocks_saving_list.append(str(stock_number)+" "+str(stock_name)+" (收盤價: " + str(price)+"/年殖利率 5% 的價格: "+str(price_5_percent)+"/現在殖利率: "+current_dividend_yield+")")
             else:
                 sheet.update_cell(idx,17, '')
             time.sleep(1)
